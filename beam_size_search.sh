@@ -3,7 +3,7 @@
 option=$1
 
 if [ "$option" == "bs" ]; then
-    for beam_size in {25..25}
+    for beam_size in {1..25}
     do
         output_file="assignments/05/beam_search/translations_beam_${beam_size}.txt"
         python translate_beam.py \
