@@ -126,7 +126,7 @@ def main(args):
                     mask = None
 
                 node = BeamSearchNode(searches[i], emb, lstm_out, final_hidden, final_cell,
-                                      mask, torch.cat((go_slice[i], next_word)), log_p, 1, 0, j)
+                                      mask, torch.cat((go_slice[i], next_word)), log_p, 1, 0, j+1)
                 # __QUESTION 3: Why do we add the node with a negative score?
                 searches[i].add(-node.eval(args.alpha, args.uid, args.gamma), node)
 
@@ -190,7 +190,7 @@ def main(args):
                         node = BeamSearchNode(
                             search, node.emb, node.lstm_out, node.final_hidden,
                             node.final_cell, node.mask, torch.cat((prev_words[i][0].view([1]),
-                            next_word)), node.logp, node.length, node.logpsq + node.logp**2, j
+                            next_word)), node.logp, node.length, node.logpsq + node.logp**2, j+1
                             )
                         search.add_final(-node.eval(args.alpha, args.uid, args.gamma), node)
 
@@ -200,7 +200,7 @@ def main(args):
                             search, node.emb, node.lstm_out, node.final_hidden,
                             node.final_cell, node.mask, torch.cat((prev_words[i][0].view([1]),
                             next_word)), node.logp + log_p, node.length + 1,
-                            node.logpsq + node.logp**2, j
+                            node.logpsq + node.logp**2, j+1
                             )
                         search.add(-node.eval(args.alpha, args.uid, args.gamma), node)
 
