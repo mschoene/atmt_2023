@@ -232,14 +232,18 @@ def main(args):
         output_sentences = [tgt_dict.string(sent) for sent in output_sentences]
 
         for ii, sent in enumerate(output_sentences):
-            all_hyps[int(sample['id'].data[ii//args.top_k])] = sent
+            idx = int(sample['id'].data[ii//args.top_k])
+            if idx not in all_hyps:
+                all_hyps[idx] = []
+            all_hyps[idx].append(sent)
 
 
     # Write to file
     if args.output is not None:
         with open(args.output, 'w') as out_file:
             for sent_id in range(len(all_hyps.keys())):
-                out_file.write(all_hyps[sent_id] + '\n')
+                for sent in all_hyps[sent_id]:
+                    out_file.write(sent + '\n')
 
 
 if __name__ == '__main__':

@@ -54,7 +54,8 @@ elif [ "$option" == "uid" ]; then
 elif [ "$option" == "diverse" ]; then
     beam_size=5
     uid=0.
-    top_k=5
+    top_k=3
+    gamma=1
     output_file="assignments/05/beam_search/translations_beam_diversity_${top_k}.txt"
     python translate_beam.py \
         --data data/en-fr/prepared \
@@ -63,6 +64,7 @@ elif [ "$option" == "diverse" ]; then
         --output "${output_file}" \
         --batch-size 64 \
         --beam-size "${beam_size}" \
+        --gamma "${gamma}" \
         --top_k "${top_k}"
     echo "Diversity with beam_size ${beam_size} and uuid ${uid} and top_k ${top_k} saved to ${output_file}"
 else
