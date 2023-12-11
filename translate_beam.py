@@ -32,11 +32,9 @@ def get_args():
     parser.add_argument('--beam-size', default=5, type=int, help='number of hypotheses expanded in beam search')
     # alpha hyperparameter for length normalization (described as lp in https://arxiv.org/pdf/1609.08144.pdf equation 14)
     parser.add_argument('--alpha', default=0.0, type=float, help='alpha for softer length normalization')
-    #UID-decoding
-    parser.add_argument('--uid', default=0.0, type=float, help='UID regularization factors')
-
+    # lambda for squared regularization 
+    parser.add_argument('--uid', default=0.0, type=float, help='lambda for squared regularization')
     return parser.parse_args()
-
 
 def main(args):
     """ Main translation function' """
@@ -121,9 +119,9 @@ def main(args):
                     mask = None
 
                 node = BeamSearchNode(searches[i], emb, lstm_out, final_hidden, final_cell,
-                                      mask, torch.cat((go_slice[i], next_word)), log_p, 1)
+                                      mask, torch.cat((go_slice[i], next_word)), log_p, 1, 0)
                 # __QUESTION 3: Why do we add the node with a negative score?
-                searches[i].add(-node.eval(args.alpha), node)
+                searches[i].add(-node.eval(args.alpha, args.uid), node)
 
         #import pdb;pdb.set_trace()
         # Start generating further tokens until max sentence length reached
@@ -152,6 +150,7 @@ def main(args):
                 #print(decoder_out)
 
             # see __QUESTION 2
+            #regularize here!
             log_probs, next_candidates = torch.topk(torch.log(torch.softmax(decoder_out, dim=2)), args.beam_size+1, dim=-1)
             #print("logprobs ", log_probs)
 
@@ -185,20 +184,19 @@ def main(args):
                         node = BeamSearchNode(
                             search, node.emb, node.lstm_out, node.final_hidden,
                             node.final_cell, node.mask, torch.cat((prev_words[i][0].view([1]),
-                            next_word)), node.logp, node.length
+                            next_word)), node.logp, node.length, node.logpsq + node.logp**2
                             )
-                        search.add_final(-node.eval(args.alpha), node)
+                        search.add_final(-node.eval(args.alpha, args.uid), node)
 
                     # Add the node to current nodes for next iteration
                     else:
                         node = BeamSearchNode(
                             search, node.emb, node.lstm_out, node.final_hidden,
                             node.final_cell, node.mask, torch.cat((prev_words[i][0].view([1]),
-                            next_word)), node.logp + log_p, node.length + 1
+                            next_word)), node.logp + log_p, node.length + 1,
+                            node.logpsq + node.logp**2
                             )
-                        search.add(-node.eval(args.alpha), node)
-                        #print("note log p next ", node.length, node.logp)
-
+                        search.add(-node.eval(args.alpha, args.uid), node)
 
             # #import pdb;pdb.set_trace()
             # __QUESTION 5: What happens internally when we prune our beams?

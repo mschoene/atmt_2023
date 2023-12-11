@@ -67,7 +67,7 @@ class BeamSearch(object):
 
 class BeamSearchNode(object):
     """ Defines a search node and stores values important for computation of beam search path"""
-    def __init__(self, search, emb, lstm_out, final_hidden, final_cell, mask, sequence, logProb, length):
+    def __init__(self, search, emb, lstm_out, final_hidden, final_cell, mask, sequence, logProb, length, log_prob_sq):
 
         # Attributes needed for computation of decoder states
         self.sequence = sequence
@@ -80,19 +80,20 @@ class BeamSearchNode(object):
         # Attributes needed for computation of sequence score
         self.logp = logProb
         self.length = length
-
+        self.logpsq = log_prob_sq
         self.search = search
 
-    def eval(self, alpha=0.0):
+    def eval(self, alpha, uid):
         """ Returns score of sequence up to this node 
 
         params: 
-            :alpha float (default=0.0): hyperparameter for
+            :alpha float: hyperparameter for
             length normalization described in in
             https://arxiv.org/pdf/1609.08144.pdf (equation
             14 as lp), default setting of 0.0 has no effect
-        
+            :uid float: hyperparameter for UID-decoding.
         """
         normalizer = (5 + self.length)**alpha / (5 + 1)**alpha
-        return self.logp / normalizer
+        regularized = self.logp  - uid * self.logpsq
+        return regularized / normalizer
         
