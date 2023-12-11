@@ -32,6 +32,8 @@ def get_args():
     parser.add_argument('--beam-size', default=5, type=int, help='number of hypotheses expanded in beam search')
     # alpha hyperparameter for length normalization (described as lp in https://arxiv.org/pdf/1609.08144.pdf equation 14)
     parser.add_argument('--alpha', default=0.0, type=float, help='alpha for softer length normalization')
+    #UID-decoding
+    parser.add_argument('--uid', default=0.0, type=float, help='UID regularization factors')
 
     return parser.parse_args()
 
@@ -96,6 +98,7 @@ def main(args):
             log_probs, next_candidates = torch.topk(torch.log(torch.softmax(decoder_out, dim=2)),
                                                     args.beam_size+1, dim=-1)
 
+
         # Create number of beam_size beam search nodes for every input sentence
         for i in range(batch_size):
             for j in range(args.beam_size):
@@ -146,9 +149,11 @@ def main(args):
             with torch.no_grad():
                 # Compute the decoder output by feeding it the decoded sentence prefix
                 decoder_out, _ = model.decoder(prev_words, encoder_out)
+                #print(decoder_out)
 
             # see __QUESTION 2
             log_probs, next_candidates = torch.topk(torch.log(torch.softmax(decoder_out, dim=2)), args.beam_size+1, dim=-1)
+            #print("logprobs ", log_probs)
 
             # Create number of beam_size next nodes for every current node
             for i in range(log_probs.shape[0]):
@@ -165,7 +170,12 @@ def main(args):
 
                     # Get parent node and beam search object for corresponding sentence
                     node = nodes[i]
+                    #print("note log p ", node.length, node.logp, log_p)
                     search = node.search
+                    
+                    #UID: if set to 0 (default) there is no effect
+                    log_p = log_p - args.uid * node.logp**2 
+
 
                     # __QUESTION 4: How are "add" and "add_final" different? 
                     # What would happen if we did not make this distinction?
@@ -187,6 +197,8 @@ def main(args):
                             next_word)), node.logp + log_p, node.length + 1
                             )
                         search.add(-node.eval(args.alpha), node)
+                        #print("note log p next ", node.length, node.logp)
+
 
             # #import pdb;pdb.set_trace()
             # __QUESTION 5: What happens internally when we prune our beams?
