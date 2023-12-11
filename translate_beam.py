@@ -12,6 +12,11 @@ from seq2seq.data.dictionary import Dictionary
 from seq2seq.data.dataset import Seq2SeqDataset, BatchSampler
 from seq2seq.beam import BeamSearch, BeamSearchNode
 
+def check_positive(value):
+    ivalue = int(value)
+    if ivalue <= 0:
+        raise argparse.ArgumentTypeError("%s is an invalid positive int value" % value)
+    return ivalue
 
 def get_args():
     """ Defines generation-specific hyper-parameters. """
@@ -34,6 +39,8 @@ def get_args():
     parser.add_argument('--alpha', default=0.0, type=float, help='alpha for softer length normalization')
     # lambda for squared regularization 
     parser.add_argument('--uid', default=0.0, type=float, help='lambda for squared regularization')
+    parser.add_argument('--gamma', default=0.0, type=float, help='gamma for rank penalty')
+    parser.add_argument('--top_k', default=1, type=check_positive, help='number of translations per sentence.')
     return parser.parse_args()
 
 def main(args):
@@ -119,9 +126,9 @@ def main(args):
                     mask = None
 
                 node = BeamSearchNode(searches[i], emb, lstm_out, final_hidden, final_cell,
-                                      mask, torch.cat((go_slice[i], next_word)), log_p, 1, 0)
+                                      mask, torch.cat((go_slice[i], next_word)), log_p, 1, 0, j)
                 # __QUESTION 3: Why do we add the node with a negative score?
-                searches[i].add(-node.eval(args.alpha, args.uid), node)
+                searches[i].add(-node.eval(args.alpha, args.uid, args.gamma), node)
 
         #import pdb;pdb.set_trace()
         # Start generating further tokens until max sentence length reached
@@ -150,7 +157,6 @@ def main(args):
                 #print(decoder_out)
 
             # see __QUESTION 2
-            #regularize here!
             log_probs, next_candidates = torch.topk(torch.log(torch.softmax(decoder_out, dim=2)), args.beam_size+1, dim=-1)
             #print("logprobs ", log_probs)
 
@@ -184,9 +190,9 @@ def main(args):
                         node = BeamSearchNode(
                             search, node.emb, node.lstm_out, node.final_hidden,
                             node.final_cell, node.mask, torch.cat((prev_words[i][0].view([1]),
-                            next_word)), node.logp, node.length, node.logpsq + node.logp**2
+                            next_word)), node.logp, node.length, node.logpsq + node.logp**2, j
                             )
-                        search.add_final(-node.eval(args.alpha, args.uid), node)
+                        search.add_final(-node.eval(args.alpha, args.uid, args.gamma), node)
 
                     # Add the node to current nodes for next iteration
                     else:
@@ -194,9 +200,9 @@ def main(args):
                             search, node.emb, node.lstm_out, node.final_hidden,
                             node.final_cell, node.mask, torch.cat((prev_words[i][0].view([1]),
                             next_word)), node.logp + log_p, node.length + 1,
-                            node.logpsq + node.logp**2
+                            node.logpsq + node.logp**2, j
                             )
-                        search.add(-node.eval(args.alpha, args.uid), node)
+                        search.add(-node.eval(args.alpha, args.uid, args.gamma), node)
 
             # #import pdb;pdb.set_trace()
             # __QUESTION 5: What happens internally when we prune our beams?
@@ -205,7 +211,8 @@ def main(args):
                 search.prune()
 
         # Segment into sentences
-        best_sents = torch.stack([search.get_best()[1].sequence[1:].cpu() for search in searches])
+        repeated_sentences = [nod3.sequence[1:].cpu() for search in searches for nod3 in search.get_best(args.top_k)]
+        best_sents = torch.stack(repeated_sentences)
         decoded_batch = best_sents.numpy()
         #import pdb;pdb.set_trace()
 
@@ -225,7 +232,7 @@ def main(args):
         output_sentences = [tgt_dict.string(sent) for sent in output_sentences]
 
         for ii, sent in enumerate(output_sentences):
-            all_hyps[int(sample['id'].data[ii])] = sent
+            all_hyps[int(sample['id'].data[ii//args.top_k])] = sent
 
 
     # Write to file

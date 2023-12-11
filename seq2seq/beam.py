@@ -36,7 +36,7 @@ class BeamSearch(object):
             nodes.append((node[0], node[2]))
         return nodes
 
-    def get_best(self):
+    def get_best(self, k):
         """ Returns final node with the lowest negative log probability """
         # Merge EOS paths and those that were stopped by
         # max sequence length (still in nodes)
@@ -48,11 +48,11 @@ class BeamSearch(object):
         for _ in range(self.nodes.qsize()):
             node = self.nodes.get()
             merged.put(node)
-
-        node = merged.get()
-        node = (node[0], node[2])
-
-        return node
+        top_k_nodes = []
+        for _ in range(k):
+            score, _, node = merged.get()
+            top_k_nodes.append(node)
+        return top_k_nodes
 
     def prune(self):
         """ Removes all nodes but the beam_size best ones (lowest neg log prob) """
@@ -67,7 +67,7 @@ class BeamSearch(object):
 
 class BeamSearchNode(object):
     """ Defines a search node and stores values important for computation of beam search path"""
-    def __init__(self, search, emb, lstm_out, final_hidden, final_cell, mask, sequence, logProb, length, log_prob_sq):
+    def __init__(self, search, emb, lstm_out, final_hidden, final_cell, mask, sequence, logProb, length, log_prob_sq, rank):
 
         # Attributes needed for computation of decoder states
         self.sequence = sequence
@@ -82,8 +82,9 @@ class BeamSearchNode(object):
         self.length = length
         self.logpsq = log_prob_sq
         self.search = search
+        self.rank = rank
 
-    def eval(self, alpha, uid):
+    def eval(self, alpha, uid, rank_gamma):
         """ Returns score of sequence up to this node 
 
         params: 
@@ -95,5 +96,7 @@ class BeamSearchNode(object):
         """
         normalizer = (5 + self.length)**alpha / (5 + 1)**alpha
         regularized = self.logp  - uid * self.logpsq
-        return regularized / normalizer
+        regularized = regularized / normalizer
+        regularized -= rank_gamma * self.rank
+        return regularized
         

@@ -51,6 +51,20 @@ elif [ "$option" == "uid" ]; then
     scripts/postprocess.sh "${output_file}" "${translation_file_pp}" en
     cat data/en-fr/raw/test.en | sacrebleu "${translation_file_pp}" >>  "${translation_file_score}" 
     echo "Translations with beam_size ${beam_size} and uuid ${uid} saved to ${output_file}"
+elif [ "$option" == "diverse" ]; then
+    beam_size=5
+    uid=0.
+    top_k=5
+    output_file="assignments/05/beam_search/translations_beam_diversity_${top_k}.txt"
+    python translate_beam.py \
+        --data data/en-fr/prepared \
+        --dicts data/en-fr/prepared \
+        --checkpoint-path assignments/03/baseline/checkpoints/checkpoint_best.pt \
+        --output "${output_file}" \
+        --batch-size 64 \
+        --beam-size "${beam_size}" \
+        --top_k "${top_k}"
+    echo "Diversity with beam_size ${beam_size} and uuid ${uid} and top_k ${top_k} saved to ${output_file}"
 else
-    echo "Invalid option. Please use 'bs', 'pp', 'score', or 'uid'."
+    echo "Invalid option. Please use 'bs', 'pp', 'score', 'uid', or 'diverse'."
 fi
